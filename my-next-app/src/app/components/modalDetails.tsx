@@ -22,23 +22,21 @@ interface Task {
   startDate: Date | null;
   deadline: Date | null;
   status: Status;
-  priority: Priority;  // Ajout des champs manquants
+  priority: Priority; 
   categ: Category;
   user: string;
 }
 
-interface EditTaskModalProps {
+interface DetailTaskModalProps {
   show: boolean;
   handleClose: () => void;
   task: Task | null;
-  onSave: (updatedTask: Task) => void;
 }
 
-const EditTaskModal: React.FC<EditTaskModalProps> = ({
+const DetailsTaskModal: React.FC<DetailTaskModalProps> = ({
   show,
   handleClose,
   task,
-  onSave
 }) => {
   const [data, setData] = useState<Task | null>(task);
 
@@ -46,45 +44,23 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
     setData(task);
   }, [task]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    if (data) {
-      const { name, value, type } = e.target;
-  
-      if (type === "date") {
-        setData({
-          ...data,
-          [name]: value ? new Date(value) : null,  
-        });
-      } else {
-        setData({ ...data, [name]: value });
-      }
-    }
-  };
 
-  const onSubmitHandler = (e:React.FormEvent) => {
-    e.preventDefault()
-    if (data) {
-    onSave(data); 
-
-      handleClose();
-    }
-  };
   if(!show || !data) return null
   return (
     <Modal show={show} onHide={handleClose} centered>
       <Modal.Header closeButton>
-        <Modal.Title>Update this Task</Modal.Title>
+        <Modal.Title>Details of this task</Modal.Title>
       </Modal.Header>
       <Modal.Body>
         
-      <Form onSubmit={onSubmitHandler}>
+      <Form>
   <Form.Group className="mb-3">
     <Form.Label>Title</Form.Label>
     <Form.Control
       type="text"
       name="title"
       value={data?.title || ''}
-      onChange={handleChange}
+      readOnly 
     />
   </Form.Group>
 
@@ -95,7 +71,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
       name="description"
       rows={3}
       value={data?.description || ''}
-      onChange={handleChange}
+      readOnly 
     />
   </Form.Group>
 
@@ -105,43 +81,47 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
       type="date"
       name="startDate"
       value={data?.startDate ? data.startDate.toISOString().split('T')[0] : ''}
-      onChange={handleChange}
+      readOnly 
     />
   </Form.Group>
 
   <Form.Group className="mb-3">
     <Form.Label>Deadline</Form.Label>
     <Form.Control
-      type="date"
-      name="deadline"
-      value={data?.deadline ? data.deadline.toISOString().split('T')[0] : ''}
-      onChange={handleChange}
+      as="textarea"
+      name="status"
+      rows={3}
+      value={data?.status || ''}
+      readOnly 
     />
   </Form.Group>
-
   <Form.Group className="mb-3">
-    <Form.Label>Statut</Form.Label>
-    <Form.Select name="status" value={data?.status} onChange={handleChange}>
-      <option value="pending">Pending</option>
-      <option value="completed">Completed</option>
-    </Form.Select>
+    <Form.Label>Category</Form.Label>
+    <Form.Control
+      as="textarea"
+      name="categ"
+      rows={3}
+      value={data?.categ|| ''}
+      readOnly 
+    />
   </Form.Group>
-
-  <Modal.Footer>
-    <Button variant="secondary" onClick={handleClose}>
-      Cancel
-    </Button>
-    <Button variant="primary" type="submit">
-      Update
-    </Button>
-  </Modal.Footer>
+ 
+  <Form.Group className="mb-3">
+    <Form.Label>Priority</Form.Label>
+    <Form.Control
+      as="textarea"
+      name="priority"
+      rows={3}
+      value={data?.priority || ''}
+      readOnly 
+    />
+  </Form.Group>
 </Form>
 
-    
       </Modal.Body>
     
     </Modal>
   );
 };
 
-export default EditTaskModal;
+export default DetailsTaskModal;

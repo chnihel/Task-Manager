@@ -1,12 +1,15 @@
 "use client"
 import Layout from './components/layout';
 import { FaCheckCircle, FaPen, FaPlus, FaSearch, FaTrash } from 'react-icons/fa';
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import EditTaskModal from './components/modalEdit';
 import { GiSandsOfTime } from 'react-icons/gi';
 import { MdOutlineAccessTime, MdTimerOff } from 'react-icons/md';
+import { NotificationContext } from '@/app/components/NotificationProvider';
+import { BiDetail } from 'react-icons/bi';
+import DetailsTaskModal from './components/modalDetails';
 export enum Status {
   Pending = "pending",
   Completed = "completed",
@@ -45,7 +48,8 @@ interface TaskUpdate {
   user: string;
 }
 export default function Home() {
-
+  const notificationContext = useContext(NotificationContext);
+  const fcmToken = notificationContext?.fcmToken;
   const [data, setData] = useState<Task>({
     title: "",
     description: "",
@@ -61,6 +65,41 @@ export default function Home() {
   const [startDate, deadline] = dateRange;
   const [completedCount, setCompletedCount] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);
+
+  //send notification
+  const sendNotification = async(title: string, body: string) => {
+    if (fcmToken) {
+      const response=await fetch('http://localhost:3000/notification',{
+        method:'POST',
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+      console.log(`Sending notification: ${title} - ${body}`);
+    }else  
+    console.log('Aucun token FCM disponible')
+    return
+  };
+
+  const checkDeadline = (task: Task) => {
+    if (task.deadline) {
+      const deadline = new Date(task.deadline);
+      const now = new Date();
+      const timeDiff = deadline.getTime() - now.getTime();
+      const hoursLeft = timeDiff / (1000 * 3600);
+
+      if (hoursLeft <= 24 && hoursLeft > 0) {
+        sendNotification(`Deadline approaching for task: ${task.title}`, 'You have 24 hours left!');
+        alert(`Deadline approaching for task: ${task.title} You have 24 hours left!`)
+      }
+    }
+  };
+  useEffect(() => {
+    task.forEach((task) => {
+      checkDeadline(task);
+    });
+  }, [task]);
+  //for calen
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setData({
@@ -68,6 +107,7 @@ export default function Home() {
       [name]: value,
     });
   };
+  const [taskCount, setTaskCount] = useState<number>(0);
 
   const handleDateChange = (dates: [Date | null, Date | null]) => {
     setDateRange(dates);
@@ -76,6 +116,19 @@ export default function Home() {
       startDate: dates[0],
       deadline: dates[1],
     });
+
+    if (dates[0] && dates[1]) {
+      const startDate = dates[0] instanceof Date ? dates[0] : new Date(0);  
+      const endDate = dates[1] instanceof Date ? dates[1] : new Date(0);     
+    
+      const tasksInRange = task.filter((task) => {
+        const taskDeadline = task.deadline ? new Date(task.deadline) : new Date(0); 
+    
+        return taskDeadline >= startDate && taskDeadline <= endDate;
+      });
+    
+      setTaskCount(tasksInRange.length);
+    }
   };
 
   const addTask = async (e: React.FormEvent): Promise<void> => {
@@ -86,10 +139,13 @@ export default function Home() {
       //console.log('userData',userData)
       // const userId=userData.user._id
       // console.log("userId",userId)
+      if(!userData || !userData.user){
+        alert("Please sign in to continue.")
+        return
+      }
       const taskData = {
         ...data,
         user: userData.user._id,
-
         startDate: data.startDate ? new Date(data.startDate).toISOString() : null,
         deadline: data.deadline ? new Date(data.deadline).toISOString() : null,
       };
@@ -106,6 +162,7 @@ export default function Home() {
         alert('Task added successfully!');
         console.log(result);
         fetchTask(userData.user._id)
+        statusType(userData.user._id)
       } else {
         const error = await response.json();
         alert(`Error: ${error.message}`);
@@ -152,6 +209,7 @@ export default function Home() {
     }
 
   }, [])
+
   //Status Type count(completed or pending)
   const statusType = async (id: string): Promise<void> => {
     try {
@@ -175,7 +233,7 @@ export default function Home() {
     }
   };
 
-  //search avec title
+  //search
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchQueryStatus, setSearchQueryStatus] = useState('');
@@ -192,34 +250,37 @@ export default function Home() {
 
   useEffect(() => {
     let filtered = task;
-
-    // Filtrage par titre
     if (searchQuery) {
       filtered = filtered.filter((t: any) =>
         t.title.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
-    // Filtrage par statut
     if (searchQueryStatus) {
       filtered = filtered.filter((t: any) =>
         t.status.toLowerCase().includes(searchQueryStatus.toLowerCase())
       );
     }
 
-    setFilteredTasks(filtered); // Met à jour les tâches filtrées
+    setFilteredTasks(filtered); 
   }, [searchQuery, searchQueryStatus, task]);
 
 
-  //updateData avec open modal qui existe dans componenent
+  //updateData with an open modal that exists in the component.
   const [selectedTask, setSelectedTask] = useState<any | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const openModal = (task: Task) => {
     setSelectedTask(task);
     setShowModal(true);
   };
+  const openDetailsModal = (task: Task) => {
+    setSelectedTask(task);
+    setShowDetailsModal(true);
+  };
   const closeModal = () => {
     setShowModal(false);
+    setShowDetailsModal(false);
     setSelectedTask(null);
   };
   const updateTask = async (updatedTask: TaskUpdate): Promise<void> => {
@@ -252,9 +313,9 @@ export default function Home() {
     }
   }
 
-  //delete task 
+ 
 
-
+  //delete task with id
   const deleteTask = async (id: string): Promise<void> => {
     try {
       const response = await fetch(`http://localhost:3000/task/${id}`, {
@@ -285,7 +346,7 @@ export default function Home() {
   return (
     <div>
       <div className="container text-center mt-5 pt-5" >
-        <h1 id='title' className='mt-5'>Hello, Aqeel, Start planing today</h1>
+        <h1 id='title' className='mt-5'>Hello, Aqeel, <span className='text-secondary'>Start planing today</span></h1>
       </div>
       <div className='bg-warning-subtle container p-5 rounded-5 mt-5 mb-5'>
         <div className='container mt-5 '>
@@ -294,13 +355,18 @@ export default function Home() {
               <p><strong>Start Date:</strong> {startDate ? startDate.toDateString() : ""}</p>
               <p><strong>Deadline:</strong> {deadline ? deadline.toDateString() : ""}</p>
               <DatePicker
-                selected={startDate}
-                onChange={handleDateChange}
-                startDate={startDate}
-                endDate={deadline}
-                selectsRange
-                inline
+                 selected={dateRange ? dateRange[0] : null}
+                 onChange={handleDateChange}
+                 startDate={dateRange ? dateRange[0] : null}
+                 endDate={dateRange ? dateRange[1] : null}
+                 selectsRange
+                 inline
               />
+               <div>
+                {dateRange && dateRange[0] && dateRange[1] && (
+                <p>There are {taskCount} task(s) for the selected date range.</p>
+                )}
+              </div>
 
             </div>
             <div className='col-xs-12 col-sm-12 col-md-6 col-lg-7'>
@@ -321,7 +387,7 @@ export default function Home() {
               <div className='row mt-5'>
                 <div className='col-xs-12 col-sm-12 col-md-6 col-lg-2'>
                   <select name="categ" className='form-control mb-2' value={data.categ} onChange={handleChange}>
-                    {Object.values(Category).map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                    {Object.values(Category).map((categ) => <option key={categ} value={categ}>{categ}</option>)}
                   </select>
                 </div>
                 <div className='col-xs-12 col-sm-12 col-md-6 col-lg-2'>
@@ -365,11 +431,11 @@ export default function Home() {
                       const deadlineDate = new Date(task.deadline).getTime()
                       let urgencyIcon;
                       if (deadlineDate < today) {
-                        urgencyIcon = <MdTimerOff style={{ color: 'red', fontSize: '25px' }} />; // 🚨 Rouge (Urgent)
+                        urgencyIcon = <MdTimerOff style={{ color: 'red', fontSize: '25px' }} />;
                       } else if ((deadlineDate - today) / (1000 * 60 * 60 * 24) <= 3) {
-                        urgencyIcon = <GiSandsOfTime style={{ color: 'orange', fontSize: '25px' }} />; // ⏳ Orange (À venir)
+                        urgencyIcon = <GiSandsOfTime style={{ color: 'orange', fontSize: '25px' }} />; 
                       } else {
-                        urgencyIcon = <MdOutlineAccessTime style={{ color: 'green', fontSize: '25px' }} />; // ✅ Vert (Ok)
+                        urgencyIcon = <MdOutlineAccessTime style={{ color: 'green', fontSize: '25px' }} />; 
                       }
                       return (
                         <div
@@ -394,7 +460,7 @@ export default function Home() {
 
                             <p>{task.description}</p><FaPen
                               style={{
-                                color: 'black', // Couleur de l'icône de modification
+                                color: 'black', 
                                 cursor: 'pointer',
                                 fontSize: '20px',
                               }}
@@ -406,11 +472,12 @@ export default function Home() {
                             <div>
                               <h6>Start Date: {task.startDate ? new Date(task.startDate).toLocaleDateString() : 'N/A'}</h6>
                               <h6>Due Date: {task.deadline ? new Date(task.deadline).toLocaleDateString() : 'N/A'}</h6>
-                              <p>Status: {task.status}</p>
                             </div>
                             <FaTrash onClick={() => deleteTask(task._id)} />
+                            
                           </div>
-
+                          <BiDetail onClick={()=>openModal(task)}/>
+                            <DetailsTaskModal show={showDetailsModal} handleClose={closeModal} task={selectedTask}/>
                         </div>
                       )
                     })
@@ -427,16 +494,16 @@ export default function Home() {
 
 
         </div>
-        <div className='row mt-5 g-3'>
-          <div className='col-xs-12 col-sm-12 col-md-6 col-lg-3 text-center' style={{ backgroundColor: "#cf9043" }}>
+        <div className='row mt-5 gutter container'>
+          <div className='col-xs-12 col-sm-12 col-md-6 col-lg-2 text-center rounded-5 pt-2' style={{ backgroundColor: "#cf9043" }}>
             <h5>completed tasks</h5>
             <h3>{completedCount}</h3>
           </div>
-          <div className='col-xs-12 col-sm-12 col-md-6 col-lg-3 text-center' style={{ backgroundColor: "rgba(121, 26, 26, 0.53);" }}>
+          <div className='col-xs-12 col-sm-12 col-md-6 col-lg-2 text-center rounded-5 pt-2' style={{ backgroundColor: "rgba(121, 26, 26, 0.53);" }}>
             <h5>pending tasks</h5>
             <h3>{pendingCount}</h3>
           </div>
-          <div className='col-xs-12 col-sm-12 col-md-6 col-lg-6 bg-light-subtle p-3 text-center' style={{ width: "50%" }}>
+          <div className='col-xs-12 col-sm-12 col-md-6 col-lg-8 bg-light-subtle p-3 text-center rounded-5' >
             <h3><span className='text-info'>tasks created</span> {task.length} </h3>
           </div>
         </div>

@@ -4,6 +4,7 @@ import "./globals.css";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Header from "@/app/components/header";
 import Footer from "./components/footer";
+import NotificationProvider from "./components/NotificationProvider";
 
 
 const geistSans = Geist({
@@ -39,10 +40,11 @@ export default function RootLayout({
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      ><NotificationProvider>
         <Header />
         {children}
         <Footer/>
+        </NotificationProvider>
       </body>
     </html>
   );
