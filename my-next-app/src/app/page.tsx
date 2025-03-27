@@ -10,6 +10,7 @@ import { MdOutlineAccessTime, MdTimerOff } from 'react-icons/md';
 import { NotificationContext } from '@/app/components/NotificationProvider';
 import { BiDetail } from 'react-icons/bi';
 import DetailsTaskModal from './components/modalDetails';
+import { useRouter } from 'next/navigation';
 export enum Status {
   Pending = "pending",
   Completed = "completed",
@@ -48,6 +49,7 @@ interface TaskUpdate {
   user: string;
 }
 export default function Home() {
+  const router = useRouter();
   const notificationContext = useContext(NotificationContext);
   const fcmToken = notificationContext?.fcmToken;
   const [data, setData] = useState<Task>({
@@ -141,6 +143,7 @@ export default function Home() {
       // console.log("userId",userId)
       if(!userData || !userData.user){
         alert("Please sign in to continue.")
+        router.push('/register')
         return
       }
       const taskData = {
